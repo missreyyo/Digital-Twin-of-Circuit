@@ -6,11 +6,16 @@ pygame.init()
 
 temp_node = None
 
-def IsKeyClose() -> bool:
+def create_new_node(event, props):
+    Node(props[0], event.pos[0], event.pos[1])  
+    props.append(PropNode(event.pos[0], event.pos[1]))  
+   
+def IsKeyClose(self) -> bool:
     result = False
     if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 3:  
-                result = not result
+            if self.rect.collidepoint(event.pos):
+                if event.button == 3:  
+                    result = not result
     return result
  
                 
@@ -50,6 +55,7 @@ class Node:
     
     def get_pos(self):
         return (self.parent.rect.topleft[0] + self.x, self.parent.rect.topleft[1] + self.y)
+    
     
 class Prop:
     def __init__(self, img, x, y, w, h, nodes) -> None:
@@ -100,30 +106,35 @@ class Prop:
                     else:
                         temp_node = node
                     break
-           
+
+
 class Lamp(Prop):
     def __init__(self, x, y) -> None:
         super().__init__("lightbulb.png", x, y, 50, 50, [Node(self, -2, 43), Node(self, 52, 43)])
 
     def update(self):
-        counter = 0
+        node_counter = 0
+        edge_counter = 0
         for node in self.nodes:
+            node_counter += 1
             for edge in node.edges:
                 if edge.hasElectric:
-                    counter = counter + 1
-                    if counter == 2:
-                        print("lamba yanıyo")
-                        self.img = pygame.image.load("lamp.png")
-                        self.img = pygame.transform.scale(self.img, (50, 50))
-                        self.rect = self.img.get_rect(topleft=self.rect.topleft)
-                        super().draw(screen)
-                    else:
-                        self.img = pygame.image.load("lightbulb.png")
-                        self.img = pygame.transform.scale(self.img, (50, 50))
-                        self.rect = self.img.get_rect(topleft=self.rect.topleft)
-                        super().draw(screen)
-
-        counter = 0    
+                    edge_counter += 1
+                    break
+        print("edge counter"  ,edge_counter)
+        if node_counter == edge_counter:
+            self.img = pygame.image.load("lamp.png")
+            self.img = pygame.transform.scale(self.img, (50, 50))
+            self.rect = self.img.get_rect(topleft=self.rect.topleft)
+            super().draw(screen)
+        else:
+            self.img = pygame.image.load("lightbulb.png")
+            self.img = pygame.transform.scale(self.img, (50, 50))
+            self.rect = self.img.get_rect(topleft=self.rect.topleft)
+            super().draw(screen)                   
+        node_counter = 0
+        edge_counter = 0
+           
 
 class Battery(Prop):
     def __init__(self, x, y) -> None:
@@ -138,21 +149,40 @@ class Key(Prop):
     def __init__(self, x, y) -> None:
         super().__init__("key.png", x, y, 100, 50, [Node(self, -6, 30), Node(self, 107, 30)])
         self.open = False
-        self.prev_key_state = False  # Yeni bir değişken ekleyin
+        self.prev_key_state = False  
 
     def update(self):
-        key_state = IsKeyClose()
-        
-        if key_state != self.prev_key_state:
-            self.prev_key_state = key_state
-            if key_state:
-                self.open = not self.open
-
+        has_electric = False
         for node in self.nodes:
             for edge in node.edges:
-                edge.hasElectric = self.open
-                        
-                    
+                if edge.hasElectric:
+                    has_electric = True
+        if has_electric:
+            key_state = IsKeyClose(self)
+            
+            if key_state != self.prev_key_state:
+                self.prev_key_state = key_state
+                if key_state:
+                    self.open = not self.open
+                else:
+                    self.open = self.open
+
+            for node in self.nodes:
+                for edge in node.edges:
+                    edge.hasElectric = self.open
+
+
+class PropNode(Prop):
+    def __init__(self, x, y) -> None:
+        super().__init__("node.png", x, y,17,17 , [Node(self, 9, 9)])
+    
+    def update(self):
+        for node in self.nodes:
+            for edge in node.edges:  
+                if edge.hasElectric:
+                    for edge in node.edges:
+                        edge.hasElectric = True
+
                 
 # Screen init
 screen = pygame.display.set_mode((800, 600))
@@ -162,7 +192,7 @@ pygame.display.set_caption("Circuit Creator")
 icon = pygame.image.load('electrical-circuit.png')
 pygame.display.set_icon(icon)
 
-props = [Key (200, 50),Lamp(30, 50), Battery(100, 50) ]
+props = [Battery(100, 50),Lamp(30, 50) , Key (200, 50)]
 
 edges = []
 
@@ -177,6 +207,9 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            if not any(prop.rect.collidepoint(event.pos) for prop in props):
+                create_new_node(event, props)
         for prop in props:
             prop.movingObjects(event)
             prop.foundCableNodes(event)
@@ -184,7 +217,11 @@ while running:
            
     
     screen.fill((255, 255, 255))
-
+    for prop in props:
+            for node in prop.nodes:
+             #   if node.parent is PropNode :
+                    for edge in node.edges:
+                        edge.hasElectric = False
     for prop in props:
         prop.update()
         prop.draw(screen)

@@ -1,31 +1,62 @@
 import pygame
+import math
 
 pygame.init()
 
-temporary_fromNodes = []
-temporary_toNodes = []
+
+temp_node = None
+
+def create_new_node(event, props):
+    Node(props[0], event.pos[0], event.pos[1])  
+    props.append(PropNode(event.pos[0], event.pos[1]))  
+   
+def IsKeyClose(self) -> bool:
+    result = False
+    if event.type == pygame.MOUSEBUTTONDOWN:
+            if self.rect.collidepoint(event.pos):
+                if event.button == 3:  
+                    result = not result
+    return result
+ 
+                
+def circle_to_point_coll(circle_pos, radius, point):
+    dx = point[0] - circle_pos[0]
+    dy = point[1] - circle_pos[1]
+    dist = math.sqrt(dx * dx + dy *dy)
+    return dist <= radius
+
 class Edge:
-    def __init__(self, fromNode, toNode) -> None:
-        self.fromNode = fromNode
-        self.toNode = toNode
+    def __init__(self, from_node, to_node) -> None:
+        self.from_node = from_node
+        self.to_node = to_node
+        self.hasElectric = False
+        from_node.edges.add(self)
+        to_node.edges.add(self)
+        
     
     def __eq__(self, other: object) -> bool:
-        return other.fromNode.id == self.fromNode.id and other.toNode.id == self.toNode.id
+        return other.from_node.id == self.from_node.id and other.to_node.id == self.to_node.id
 
     def __hash__(self) -> int:
-        return hash((self.fromNode.id, self.toNode.id))
+        return hash((self.from_node.id, self.to_node.id))
+    
 
 class Node:
     counter = 0
-    def __init__(self, x = 0, y = 0, radius = 8, border = 1) -> None:
+    def __init__(self, parent, x = 0, y = 0, radius = 8, border = 1) -> None:
         Node.counter += 1
         self.id = Node.counter
-        self.edges = []
+        self.edges = set()
         self.radius = radius
         self.border = border
         self.x = x
         self.y = y
-
+        self.parent = parent
+    
+    def get_pos(self):
+        return (self.parent.rect.topleft[0] + self.x, self.parent.rect.topleft[1] + self.y)
+    
+    
 class Prop:
     def __init__(self, img, x, y, w, h, nodes) -> None:
         self.img = pygame.image.load(img)
@@ -33,21 +64,28 @@ class Prop:
         self.rect = self.img.get_rect(topleft=(x,y))
         self.nodes = nodes
     
+    def update(self):
+        pass
+
     def draw(self, screen):
         screen.blit(self.img, self.rect.topleft)
     
-    def drawNodes(self, screen):
+    def draw_nodes_and_edges(self, screen):
         for node in self.nodes:
-            pygame.draw.circle(screen, (0,0,0), (self.rect.topleft[0]+ node.x,self.rect.topleft[1]+ node.y), node.radius, node.border)
+            pygame.draw.circle(screen, (0,0,0), node.get_pos(), node.radius, node.border)
+            for edge in node.edges:
+                if edge.hasElectric:
+                    pygame.draw.line(screen, (242,218,9), edge.from_node.get_pos(), edge.to_node.get_pos())
+                else:
+                    pygame.draw.line(screen, (0,0,0), edge.from_node.get_pos(), edge.to_node.get_pos())
+
     def movingObjects(self, event):
         global moving_object, moving_offset
 
         if event.type == pygame.MOUSEBUTTONDOWN:
-            for prop in props:
-                if prop.rect.collidepoint(event.pos):
-                    moving_object = prop
-                    moving_offset = (event.pos[0] - prop.rect.topleft[0], event.pos[1] - prop.rect.topleft[1])
-                    break
+            if self.rect.collidepoint(event.pos):
+                moving_object = self
+                moving_offset = (event.pos[0] - self.rect.topleft[0], event.pos[1] - self.rect.topleft[1])
     
         if event.type == pygame.MOUSEBUTTONUP:
             moving_object = None
@@ -55,34 +93,89 @@ class Prop:
         if event.type == pygame.MOUSEMOTION:
             if moving_object is not None:
                 moving_object.rect.topleft = (event.pos[0] - moving_offset[0], event.pos[1] - moving_offset[1])
-    
+
     def foundCableNodes(self, event): 
+        global temp_node
         if event.type == pygame.MOUSEBUTTONDOWN:
-            for prop in props:
-                if prop.rect.collidepoint(event.pos):
-                    for node in prop.nodes:
-                        temporary_fromNodes.append(node)
-        if event.type == pygame.MOUSEBUTTONUP:
-            for prop in props:
-                if prop.rect.collidepoint(event.pos):
-                    for node in prop.nodes:
-                        temporary_toNodes.append(node)
-        
-    def createEdges(self):
-            edges.append(Edge(temporary_fromNodes.pop, temporary_toNodes.pop))
-        
-   
+            for node in self.nodes:
+                if circle_to_point_coll(node.get_pos(), node.radius, event.pos):
+                    if(temp_node != None):
+                        if temp_node != node:
+                            Edge(temp_node, node)
+                        temp_node = None
+                    else:
+                        temp_node = node
+                    break
+
+
 class Lamp(Prop):
     def __init__(self, x, y) -> None:
-        super().__init__("lamp.png", x, y, 50, 50, [Node(-4, 43), Node(40, 43)])
+        super().__init__("lightbulb.png", x, y, 50, 50, [Node(self, -2, 43), Node(self, 52, 43)])
+
+    def update(self):
+        node_counter = 0
+        edge_counter = 0
+        for node in self.nodes:
+            node_counter += 1
+            for edge in node.edges:
+                if edge.hasElectric:
+                    edge_counter += 1
+                    break
+        if node_counter == edge_counter:
+            print("lamba yanıyo")
+            self.img = pygame.image.load("lamp.png")
+            self.img = pygame.transform.scale(self.img, (50, 50))
+            self.rect = self.img.get_rect(topleft=self.rect.topleft)
+            super().draw(screen)
+        else:
+            self.img = pygame.image.load("lightbulb.png")
+            self.img = pygame.transform.scale(self.img, (50, 50))
+            self.rect = self.img.get_rect(topleft=self.rect.topleft)
+            super().draw(screen)                   
+        node_counter = 0
+        edge_counter = 0
+           
 
 class Battery(Prop):
     def __init__(self, x, y) -> None:
-        super().__init__("battery.png", x, y, 50, 50, [Node(-4, 25), Node(54, 25)])
+        super().__init__("battery.png", x, y, 50, 50, [Node(self, -4, 25), Node(self, 54, 25)])
+
+    def update(self):
+        for node in self.nodes:
+            for edge in node.edges:
+                edge.hasElectric = True
 
 class Key(Prop):
     def __init__(self, x, y) -> None:
-        super().__init__("key.png", x, y, 100, 50, [Node(-6, 30), Node(107, 30)])
+        super().__init__("key.png", x, y, 100, 50, [Node(self, -6, 30), Node(self, 107, 30)])
+        self.open = False
+        self.prev_key_state = False  
+
+    def update(self):
+        key_state = IsKeyClose(self)
+
+        if key_state != self.prev_key_state:
+            self.prev_key_state = key_state
+            self.open = not self.open
+
+        for node in self.nodes:
+            for edge in node.edges:
+                if edge.electric_from_key:
+                    edge.hasElectric = self.open
+
+
+class PropNode(Prop):
+    def __init__(self, x, y) -> None:
+        super().__init__("node.png", x, y,17,17 , [Node(self, 9, 9)])
+    
+    def update(self):
+        for node in self.nodes:
+            for edge in node.edges:  
+                if edge.hasElectric:
+                    for edge in node.edges:
+                        edge.hasElectric = True
+
+                
 # Screen init
 screen = pygame.display.set_mode((800, 600))
 
@@ -91,34 +184,43 @@ pygame.display.set_caption("Circuit Creator")
 icon = pygame.image.load('electrical-circuit.png')
 pygame.display.set_icon(icon)
 
-props = [Lamp(30, 50), Battery(100, 50), Key (200, 50)]
+props = [Key (200, 50),Lamp(30, 50), Battery(100, 50)]
 
 edges = []
 
 # Main loop
 running = True
-moving_object = None  
-moving_offset = (0, 0)  
-drawing_cable = False
-start_cable_pos = None
-
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            if not any(prop.rect.collidepoint(event.pos) for prop in props):
+                create_new_node(event, props)
         for prop in props:
             prop.movingObjects(event)
             prop.foundCableNodes(event)
-            prop.createEdges()
-            temporary_fromNodes = []    
-            temporary_toNodes = []
-
-    screen.fill((255, 255, 255))
+            
+    for prop in props:
+        prop.update()
 
     for prop in props:
-        prop.draw(screen)
-        prop.drawNodes(screen)
+        for node in prop.nodes:
+            for edge in node.edges:
+                edge.hasElectric = False
+    for prop in props:
+        for node in prop.nodes:
+            for edge in node.edges:
+                if edge.electric_from_key:
+                    edge.hasElectric = prop.open
 
+    screen.fill((255, 255, 255))
+    for prop in props:
+        prop.draw(screen)
+        prop.draw_nodes_and_edges(screen)
+        
+    if temp_node is not None:
+        pygame.draw.line(screen, (0, 0, 0), temp_node.get_pos(), pygame.mouse.get_pos())
     pygame.display.flip()
 
 pygame.quit()
