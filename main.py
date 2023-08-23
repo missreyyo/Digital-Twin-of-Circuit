@@ -4,7 +4,7 @@ import math
 pygame.init()
 
 temp_node = None
-
+temp_points = []
              
 def circle_to_point_coll(circle_pos, radius, point):
     dx = point[0] - circle_pos[0]
@@ -49,10 +49,10 @@ class Edge:
     def __init__(self, from_node, to_node) -> None:
         self.from_node = from_node
         self.to_node = to_node
-        self.hasPoint = False
         self.hasElectric = False
         from_node.edges.add(self)
         to_node.edges.add(self)
+        self.points = []
         
     
     def remove(self,dontDel):
@@ -82,8 +82,7 @@ class Edge:
     def __hash__(self) -> int:
         return hash((self.from_node.id, self.to_node.id))
     
-    def createPoint(self, event, radius = 8, border = 1) :
-        pygame.draw.circle(screen, (0,0,0), event.pos(), radius, border)
+
         
 
 class Node:
@@ -152,19 +151,17 @@ class Prop:
     def foundCableNodes(self, event): 
         global temp_node
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 3:  
-                temp_node = Node(pygame.mouse.get_pos())  
-            else:
-                for node in self.nodes:
-                    if circle_to_point_coll(node.get_pos(), node.radius, event.pos):
-                        if temp_node is not None:
-                            if temp_node != node:
-                                Edge(temp_node, node)
-                            temp_node = None
-                        else:
-                            temp_node = node
-                    break
-
+            for node in self.nodes:
+                if circle_to_point_coll(node.get_pos(), node.radius, event.pos):
+                    if(temp_node != None):
+                        if temp_node != node:
+                            Edge(temp_node, node)
+                            
+                        temp_node = None
+                    else:
+                        temp_node = node
+                    return True
+        return False
 
 class Lamp(Prop):
     def __init__(self, x, y) -> None:
@@ -275,12 +272,17 @@ while running:
                     break
                     
         # if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
-        #     if not any(prop.rect.collidepoint(event.pos) for prop in props):
-        #         create_new_node(event, props)
+        #     if temp_node is not None :
+        #         pygame.draw.circle(screen, (0,0,0), event.pos, 8, 1)
 
+        should_point = True
         for prop in props:
             prop.movingObjects(event)
-            prop.foundCableNodes(event)
+            if prop.foundCableNodes(event) and should_point:
+                should_point = False
+
+        if event.type == pygame.MOUSEBUTTONDOWN  and event.button == 3 and should_point and temp_node != None:
+            temp_points.append(event.pos)
 
         main_menu_button.handle_event(event)
 
@@ -310,7 +312,20 @@ while running:
 
 
     if temp_node is not None:
-        pygame.draw.line(screen, (0, 0, 0), temp_node.get_pos(), pygame.mouse.get_pos())
+        drew = False
+        for i, point in enumerate(temp_points):
+            drew = True
+            if i == 0:
+                pygame.draw.line(screen, (0, 0, 0), point, temp_node.get_pos())
+            else:
+                pygame.draw.line(screen, (0, 0, 0), point, temp_points[i-1])
+            
+            if i == len(temp_points)-1:
+                pygame.draw.line(screen, (0, 0, 0), point, pygame.mouse.get_pos())
+
+            pygame.draw.circle(screen,(0,0,0), point, 8, 1)
+        if not drew:
+            pygame.draw.line(screen, (0, 0, 0), temp_node.get_pos(), pygame.mouse.get_pos())
     pygame.display.flip()
 
 pygame.quit()
