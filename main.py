@@ -209,7 +209,7 @@ class Battery(Prop):
 
 class Key(Prop):
     def __init__(self, x, y) -> None:
-        super().__init__("key.png", x, y, 100, 50, [Node(self, -6, 30), Node(self, 107, 30)]) 
+        super().__init__("blackkey.png", x, y, 100, 50, [Node(self, -6, 30), Node(self, 107, 30)]) 
         self.is_open = False
     
     def right_clicked(self):
@@ -233,25 +233,41 @@ class Key(Prop):
                         edge.setElectricity(True)
                     else:
                         edge.setElectricity(False)
+        if self.is_open:
+            self.img = pygame.image.load("key.png")
+            self.img = pygame.transform.scale(self.img, (100, 50))
+            self.rect = self.img.get_rect(topleft=self.rect.topleft)
+            super().draw(screen)            
 
-                                
+        else:
+            self.img = pygame.image.load("blackkey.png")
+            self.img = pygame.transform.scale(self.img, (100, 50))
+            self.rect = self.img.get_rect(topleft=self.rect.topleft)
+            super().draw(screen)    
+
+                            
                  
 def draw_points(points, from_pos, to_pos, has_electric):
     color = (242,218,9) if has_electric else (0,0,0)
+    color2 = (255,0,0) if has_electric else (0,0,0)
     drew = False
     for i, point in enumerate(points):
         drew = True
         if i == 0:
             pygame.draw.line(screen, color, point, from_pos)
+            pygame.draw.line(screen, color2, (point[0] - 5 , point[1] -5), (from_pos[0] -5, from_pos[1] - 5) )
         else:
             pygame.draw.line(screen, color, point, points[i-1])
+            pygame.draw.line(screen, color2, (point[0] - 5 , point[1] -5), (points[i-1][0] - 5 , points[i-1][1] -5))
         
         if i == len(points)-1:
             pygame.draw.line(screen, color, point, to_pos)
+            pygame.draw.line(screen, color2, (point[0] - 5 , point[1] -5), (to_pos[0] - 5 , to_pos[1] -5))
 
         pygame.draw.circle(screen, (0,0,0), point, 8, 1)
     if not drew:
         pygame.draw.line(screen, color, from_pos, to_pos)
+        pygame.draw.line(screen, color2, (from_pos[0] - 5 , from_pos[1] -5), (to_pos[0] - 5 , to_pos[1] -5))
 
 
 
@@ -305,6 +321,19 @@ while running:
                                 edge.points.remove(point)
 
 
+        # for prop in props:
+        #     for node in prop.nodes:
+        #         if node.parent is Key:
+        #             for node in node.parent.nodes:
+        #                 if node.parent.has_electric_thing == node:
+        #                     for edge in node:
+        #                         edge.hasElectricThings(True)
+        #             continue
+        #         for edge in node.edges:
+        #             edge.hasElectricThings(True)
+
+                
+
         for prop in props:
             for node in prop.nodes:
                 node.movePoint(event)
@@ -342,6 +371,7 @@ while running:
             for edge in node.edges:
                 edge.setElectricity(False)
 
+
     for prop in props:
         prop.update()
         prop.draw(screen)
@@ -349,7 +379,7 @@ while running:
 
 
     if temp_node is not None:
-        draw_points(temp_points, temp_node.get_pos(), pygame.mouse.get_pos(), False)
+        draw_points(temp_points, temp_node.get_pos(), pygame.mouse.get_pos(), False )
     
     pygame.display.flip()
 
