@@ -46,13 +46,13 @@ class SubmenuOption:
         return False
     
 class Edge:
-    def __init__(self, from_node, to_node) -> None:
+    def __init__(self, from_node, to_node, points) -> None:
         self.from_node = from_node
         self.to_node = to_node
         self.hasElectric = False
         from_node.edges.add(self)
         to_node.edges.add(self)
-        self.points = []
+        self.points = points
         
     
     def remove(self,dontDel):
@@ -66,13 +66,6 @@ class Edge:
         if self.hasElectric == hasElectric:
             return
         self.hasElectric = hasElectric
-
-        
-        # for edge in self.from_node.edges:
-        #     edge.hasElectric = hasElectric
-        # for edge in self.to_node.edges:
-        #     edge.hasElectric = hasElectric
-
         self.from_node.parent.update()
         self.to_node.parent.update()
    
@@ -83,7 +76,7 @@ class Edge:
         return hash((self.from_node.id, self.to_node.id))
     
 
-        
+                      
 
 class Node:
     counter = 0
@@ -99,6 +92,26 @@ class Node:
     
     def get_pos(self):
         return (self.parent.rect.topleft[0] + self.x, self.parent.rect.topleft[1] + self.y)
+    
+    def movePoint(self, event):
+        global moving_object_point_index, moving_offset_point, which_edge_point
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button != 3:
+                for edge in self.edges:
+                    for i, point in enumerate(edge.points):
+                        if circle_to_point_coll(point, 8, pygame.mouse.get_pos()):
+                            which_edge_point = edge
+                            moving_object_point_index = i
+                            moving_offset_point = (event.pos[0] - point[0], event.pos[1] - point[1])              
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            moving_object_point_index = None
+            which_edge_point = None
+            
+ 
+        if event.type == pygame.MOUSEMOTION:
+            if moving_object_point_index is not None:
+                which_edge_point.points[moving_object_point_index] = (event.pos[0] - moving_offset_point[0], event.pos[1] - moving_offset_point[1])        
     
     
 class Prop:
@@ -141,10 +154,7 @@ class Prop:
         for node in self.nodes:
             pygame.draw.circle(screen, (0,0,0), node.get_pos(), node.radius, node.border)
             for edge in node.edges:
-                if edge.hasElectric:
-                    pygame.draw.line(screen, (242,218,9), edge.from_node.get_pos(), edge.to_node.get_pos())
-                else:
-                    pygame.draw.line(screen, (0,0,0), edge.from_node.get_pos(), edge.to_node.get_pos())
+                draw_points(edge.points, edge.from_node.get_pos(), edge.to_node.get_pos(), edge.hasElectric)
         if temp_node is not None:
             pygame.draw.circle(screen, (0, 0, 0), pygame.mouse.get_pos(), 10, 1)  
 
@@ -155,8 +165,8 @@ class Prop:
                 if circle_to_point_coll(node.get_pos(), node.radius, event.pos):
                     if(temp_node != None):
                         if temp_node != node:
-                            Edge(temp_node, node)
-                            
+                            Edge(temp_node, node, temp_points.copy())
+                        temp_points.clear()    
                         temp_node = None
                     else:
                         temp_node = node
@@ -226,7 +236,22 @@ class Key(Prop):
 
                                 
                  
+def draw_points(points, from_pos, to_pos, has_electric):
+    color = (242,218,9) if has_electric else (0,0,0)
+    drew = False
+    for i, point in enumerate(points):
+        drew = True
+        if i == 0:
+            pygame.draw.line(screen, color, point, from_pos)
+        else:
+            pygame.draw.line(screen, color, point, points[i-1])
+        
+        if i == len(points)-1:
+            pygame.draw.line(screen, color, point, to_pos)
 
+        pygame.draw.circle(screen, (0,0,0), point, 8, 1)
+    if not drew:
+        pygame.draw.line(screen, color, from_pos, to_pos)
 
 
 
@@ -247,6 +272,9 @@ edges = []
 running = True
 moving_object = None
 moving_offset = (0,0)
+moving_object_point_index = None
+moving_offset_point = (0,0)
+which_edge_point = None
 
 
 main_menu_button = MenuButton("node.png", 10, 10)
@@ -270,16 +298,25 @@ while running:
                             edge.remove(node)
                     props.remove(prop)
                     break
-                    
-        # if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
-        #     if temp_node is not None :
-        #         pygame.draw.circle(screen, (0,0,0), event.pos, 8, 1)
+                for node in prop.nodes:
+                    for edge in node.edges:
+                        for point in edge.points:
+                            if circle_to_point_coll(point, 8 , pygame.mouse.get_pos() ) :
+                                edge.points.remove(point)
+
+
+        for prop in props:
+            for node in prop.nodes:
+                node.movePoint(event)
+                   
+
 
         should_point = True
         for prop in props:
             prop.movingObjects(event)
             if prop.foundCableNodes(event) and should_point:
                 should_point = False
+
 
         if event.type == pygame.MOUSEBUTTONDOWN  and event.button == 3 and should_point and temp_node != None:
             temp_points.append(event.pos)
@@ -312,20 +349,8 @@ while running:
 
 
     if temp_node is not None:
-        drew = False
-        for i, point in enumerate(temp_points):
-            drew = True
-            if i == 0:
-                pygame.draw.line(screen, (0, 0, 0), point, temp_node.get_pos())
-            else:
-                pygame.draw.line(screen, (0, 0, 0), point, temp_points[i-1])
-            
-            if i == len(temp_points)-1:
-                pygame.draw.line(screen, (0, 0, 0), point, pygame.mouse.get_pos())
-
-            pygame.draw.circle(screen,(0,0,0), point, 8, 1)
-        if not drew:
-            pygame.draw.line(screen, (0, 0, 0), temp_node.get_pos(), pygame.mouse.get_pos())
+        draw_points(temp_points, temp_node.get_pos(), pygame.mouse.get_pos(), False)
+    
     pygame.display.flip()
 
 pygame.quit()
