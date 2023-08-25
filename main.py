@@ -44,12 +44,19 @@ class SubmenuOption:
                 props.append(self.prop_class(event.pos[0], event.pos[1]))
                 return True
         return False
-    
+
+
+# bataryanın +'sından hasPlusElectric aktarılsın
+# bataryanın -'sinden hasNegativeElectric aktarılsın
+# sistemler eğer + ve - varsa çalışsın
 class Edge:
     def __init__(self, from_node, to_node, points) -> None:
         self.from_node = from_node
         self.to_node = to_node
-        self.hasElectric = False
+
+        self.hasPlusElectric = False
+        self.hasNegativeElectric = False
+
         from_node.edges.add(self)
         to_node.edges.add(self)
         self.points = points
@@ -61,13 +68,6 @@ class Edge:
         if self.to_node != dontDel:
             self.to_node.edges.remove(self)
 
-    
-    def setElectricity(self, hasElectric):
-        if self.hasElectric == hasElectric:
-            return
-        self.hasElectric = hasElectric
-        self.from_node.parent.update()
-        self.to_node.parent.update()
    
     def __eq__(self, other: object) -> bool:
         return other.from_node.id == self.from_node.id and other.to_node.id == self.to_node.id
@@ -113,7 +113,6 @@ class Node:
             if moving_object_point_index is not None:
                 which_edge_point.points[moving_object_point_index] = (event.pos[0] - moving_offset_point[0], event.pos[1] - moving_offset_point[1])        
     
-    
 class Prop:
     def __init__(self, img, x, y, w, h, nodes) -> None:
         self.img = pygame.image.load(img)
@@ -154,7 +153,8 @@ class Prop:
         for node in self.nodes:
             pygame.draw.circle(screen, (0,0,0), node.get_pos(), node.radius, node.border)
             for edge in node.edges:
-                draw_points(edge.points, edge.from_node.get_pos(), edge.to_node.get_pos(), edge.hasElectric)
+                    draw_points(edge.points, edge.from_node.get_pos(), edge.to_node.get_pos(), edge.hasPlusElectric and edge.hasNegativeElectric)
+              
         if temp_node is not None:
             pygame.draw.circle(screen, (0, 0, 0), pygame.mouse.get_pos(), 10, 1)  
 
@@ -172,21 +172,53 @@ class Prop:
                         temp_node = node
                     return True
         return False
+    
 
 class Lamp(Prop):
     def __init__(self, x, y) -> None:
         super().__init__("lightbulb.png", x, y, 50, 50, [Node(self, -2, 43), Node(self, 52, 43)])
 
+
     def update(self):
-        node_counter = 0
-        edge_counter = 0
+        positive_electric = False
+        negative_electric = False
         for node in self.nodes:
-            node_counter += 1
             for edge in node.edges:
-                if edge.hasElectric:
-                    edge_counter += 1
+                if edge.hasPlusElectric:
+                    positive_electric = True
+                    for node in self.nodes:
+                        for edge in node.edges:
+                            if not edge.hasPlusElectric:
+                                edge.hasPlusElectric = True
+                                if edge.from_node.parent != self:
+                                    for edge2 in edge.from_node.edges:
+                                        if edge != edge2:
+                                            edge2.hasPlusElectric = True
+                                    edge.from_node.parent.update()
+                                if edge.to_node.parent != self:
+                                    for edge2 in edge.to_node.edges:
+                                        if edge != edge2:
+                                            edge2.hasPlusElectric = True
+                                    edge.to_node.parent.update()
+                if edge.hasNegativeElectric:
+                    negative_electric = True
+                    for node in self.nodes:
+                        for edge in node.edges:
+                            if not edge.hasNegativeElectric:
+                                edge.hasNegativeElectric = True
+                                if edge.from_node.parent != self:
+                                    for edge2 in edge.from_node.edges:
+                                        if edge != edge2:
+                                            edge2.hasNegativeElectric = True
+                                    edge.from_node.parent.update()
+                                if edge.to_node.parent != self:
+                                    for edge2 in edge.to_node.edges:
+                                        if edge != edge2:
+                                            edge2.hasNegativeElectric = True
+                                    edge.to_node.parent.update()                                    
+
     
-        if node_counter == edge_counter:
+        if positive_electric and negative_electric:
             self.img = pygame.image.load("lamp.png")
             self.img = pygame.transform.scale(self.img, (50, 50))
             self.rect = self.img.get_rect(topleft=self.rect.topleft)
@@ -199,13 +231,39 @@ class Lamp(Prop):
            
 
 class Battery(Prop):
+    
     def __init__(self, x, y) -> None:
         super().__init__("battery.png", x, y, 50, 50, [Node(self, -4, 25), Node(self, 54, 25)])
+        
 
     def update(self):
-        for node in self.nodes:
-            for edge in node.edges:
-                edge.setElectricity(True)
+        for edge in self.nodes[1].edges:
+            edge.hasPlusElectric = True
+            if edge.from_node.parent != self:
+                for edge2 in edge.from_node.edges:
+                    if edge != edge2:
+                        edge2.hasPlusElectric = True
+                edge.from_node.parent.update()
+            if edge.to_node.parent != self:
+                for edge2 in edge.to_node.edges:
+                    if edge != edge2:
+                        edge2.hasPlusElectric = True
+                edge.to_node.parent.update()
+                        
+        for edge in self.nodes[0].edges:
+            edge.hasNegativeElectric = True
+            if edge.from_node.parent != self:
+                for edge2 in edge.from_node.edges:
+                    if edge != edge2:
+                        edge2.hasNegativeElectric = True
+                edge.from_node.parent.update()
+            if edge.to_node.parent != self:
+                for edge2 in edge.to_node.edges:
+                    if edge != edge2:
+                        edge2.hasNegativeElectric = True
+                edge.to_node.parent.update() 
+
+        
 
 class Key(Prop):
     def __init__(self, x, y) -> None:
@@ -216,23 +274,49 @@ class Key(Prop):
         self.is_open = not self.is_open
 
     def update(self):
-        has_electric_node = None
+        positive_node = None
+        negative_node = None
         for node in self.nodes:
             for edge in node.edges:
-                if self.is_open and edge.hasElectric:
-                    has_electric_node = node
-                    break
-            if has_electric_node != None:
+                if edge.hasPlusElectric:
+                    positive_node = node
+                if edge.hasNegativeElectric:
+                    negative_node = node
+            if ( positive_node != None) and (negative_node != None):
                 break
-        if has_electric_node != None:
+
+        if self.is_open and positive_node != None:
             for node in self.nodes:
-                if node == has_electric_node:
-                    continue
                 for edge in node.edges:
-                    if self.is_open:
-                        edge.setElectricity(True)
-                    else:
-                        edge.setElectricity(False)
+                    if not edge.hasPlusElectric:
+                        edge.hasPlusElectric = True
+                        if edge.from_node != self:
+                            for edge2 in edge.from_node.edges:
+                                if edge != edge2:
+                                    edge2.hasPlusElectric = True
+                            edge.from_node.parent.update()
+                        if edge.to_node != self:
+                            for edge2 in edge.to_node.edges:
+                                if edge != edge2:
+                                    edge2.hasPlusElectric = True
+                            edge.to_node.parent.update()          
+        if self.is_open and negative_node != None:
+            for node in self.nodes:
+                for edge in node.edges:
+                    if not edge.hasNegativeElectric:
+                        edge.hasNegativeElectric = True
+                        if edge.from_node.parent != self:
+                            for edge2 in edge.from_node.edges:
+                                if edge != edge2:
+                                    edge2.hasNegativeElectric = True
+                            edge.from_node.parent.update()
+                        if edge.to_node.parent != self:
+                            for edge2 in edge.to_node.edges:
+                                if edge != edge2:
+                                    edge2.hasNegativeElectric = True
+                            edge.to_node.parent.update()                 
+
+
         if self.is_open:
             self.img = pygame.image.load("key.png")
             self.img = pygame.transform.scale(self.img, (100, 50))
@@ -243,31 +327,26 @@ class Key(Prop):
             self.img = pygame.image.load("blackkey.png")
             self.img = pygame.transform.scale(self.img, (100, 50))
             self.rect = self.img.get_rect(topleft=self.rect.topleft)
-            super().draw(screen)    
+            super().draw(screen)
 
                             
                  
-def draw_points(points, from_pos, to_pos, has_electric):
-    color = (242,218,9) if has_electric else (0,0,0)
-    color2 = (255,0,0) if has_electric else (0,0,0)
+def draw_points(points, from_pos, to_pos, haselectricthing):
+    color = (255,0,0) if haselectricthing else (0,0,0)
     drew = False
     for i, point in enumerate(points):
         drew = True
         if i == 0:
             pygame.draw.line(screen, color, point, from_pos)
-            pygame.draw.line(screen, color2, (point[0] - 5 , point[1] -5), (from_pos[0] -5, from_pos[1] - 5) )
         else:
             pygame.draw.line(screen, color, point, points[i-1])
-            pygame.draw.line(screen, color2, (point[0] - 5 , point[1] -5), (points[i-1][0] - 5 , points[i-1][1] -5))
         
         if i == len(points)-1:
             pygame.draw.line(screen, color, point, to_pos)
-            pygame.draw.line(screen, color2, (point[0] - 5 , point[1] -5), (to_pos[0] - 5 , to_pos[1] -5))
 
         pygame.draw.circle(screen, (0,0,0), point, 8, 1)
     if not drew:
         pygame.draw.line(screen, color, from_pos, to_pos)
-        pygame.draw.line(screen, color2, (from_pos[0] - 5 , from_pos[1] -5), (to_pos[0] - 5 , to_pos[1] -5))
 
 
 
@@ -321,25 +400,13 @@ while running:
                                 edge.points.remove(point)
 
 
-        # for prop in props:
-        #     for node in prop.nodes:
-        #         if node.parent is Key:
-        #             for node in node.parent.nodes:
-        #                 if node.parent.has_electric_thing == node:
-        #                     for edge in node:
-        #                         edge.hasElectricThings(True)
-        #             continue
-        #         for edge in node.edges:
-        #             edge.hasElectricThings(True)
-
-                
 
         for prop in props:
             for node in prop.nodes:
-                node.movePoint(event)
-                   
+                node.movePoint(event)                  
 
-
+                  
+ 
         should_point = True
         for prop in props:
             prop.movingObjects(event)
@@ -366,11 +433,56 @@ while running:
         submenu_options = [lamp_option, battery_option, key_option]
         for option in submenu_options:
             option.draw(screen)
+
     for prop in props:
         for node in prop.nodes:
             for edge in node.edges:
-                edge.setElectricity(False)
+                edge.hasPlusElectric = False
+                edge.hasNegativeElectric = False
 
+    #lamba, key içindeki dallı iletme kısmını buna da ekle          
+    for prop in props:
+        positive_node = None
+        negative_node = None
+        for node in prop.nodes:
+            for edge in node.edges:
+                if edge.hasPlusElectric:
+                    positive_node = node
+                if edge.hasNegativeElectric:
+                    negative_node = node
+            if ( positive_node != None) and (negative_node != None):
+                break
+
+        if positive_node != None:
+            for node in prop.nodes:
+                for edge in node.edges:
+                    if not edge.hasPlusElectric:
+                        edge.hasPlusElectric = True
+                        if edge.from_node != prop:
+                            for edge2 in edge.from_node.edges:
+                                if edge != edge2:
+                                    edge2.hasPlusElectric = True
+                            edge.from_node.parent.update()
+                        if edge.to_node != prop:
+                            for edge2 in edge.to_node.edges:
+                                if edge != edge2:
+                                    edge2.hasPlusElectric = True
+                            edge.to_node.parent.update()          
+        if negative_node != None:
+            for node in prop.nodes:
+                for edge in node.edges:
+                    if not edge.hasNegativeElectric:
+                        edge.hasNegativeElectric = True
+                        if edge.from_node.parent != prop:
+                            for edge2 in edge.from_node.edges:
+                                if edge != edge2:
+                                    edge2.hasNegativeElectric = True
+                            edge.from_node.parent.update()
+                        if edge.to_node.parent != prop:
+                            for edge2 in edge.to_node.edges:
+                                if edge != edge2:
+                                    edge2.hasNegativeElectric = True
+                            edge.to_node.parent.update()  
 
     for prop in props:
         prop.update()

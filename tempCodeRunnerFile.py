@@ -1,10 +1,7 @@
-        # for prop in props:
-        #     for node in prop.nodes:
-        #         if node.parent is Key:
-        #             for node in node.parent.nodes:
-        #                 if node.parent.has_electric_thing == node:
-        #                     for edge in node:
-        #                         edge.hasElectricThings(True)
-        #             continue
-        #         for edge in node.edges:
-        #             edge.hasElectricThings(True)
+    main_menu_button.draw(screen)
+
+    if main_menu_button.submenu_open:
+        pygame.draw.rect(screen, (200, 200, 200), (0, 45, 400, 70))  
+        submenu_options = [lamp_option, battery_option, key_option]
+        for option in submenu_options:
+            option.draw(screen)
