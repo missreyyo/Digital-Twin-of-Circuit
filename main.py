@@ -1,5 +1,6 @@
 import pygame
 import math
+from pygame.locals import *
 
 pygame.init()
 
@@ -12,6 +13,9 @@ def circle_to_point_coll(circle_pos, radius, point):
     dist = math.sqrt(dx * dx + dy *dy)
     return dist <= radius
 
+def rectangle_to_point_coll(rect,  point):
+    return point[0] > rect.topleft[0] and point[0] < rect.topright[0] and point[1] > rect.topleft[1] and point[1] < rect.bottomleft[1]
+
 class MenuButton:
     def __init__(self, image, x, y):
         self.image = pygame.image.load(image)
@@ -23,7 +27,7 @@ class MenuButton:
     
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.rect.collidepoint(event.pos):
+            if circle_to_point_coll(self.rect.center, min(self.rect.width,self.rect.height)/2,scale_fix(pygame.mouse.get_pos())):
                 self.submenu_open = not self.submenu_open
                 return True
         return False
@@ -40,8 +44,8 @@ class SubmenuOption:
     
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.rect.collidepoint(event.pos):
-                props.append(self.prop_class(event.pos[0], event.pos[1]))
+            if rectangle_to_point_coll(self.rect, scale_fix(pygame.mouse.get_pos())):
+                props.append(self.prop_class((event.pos[0] / scale) + draw_where[0], (event.pos[1] / scale) + draw_where[1]))
                 return True
         return False
 
@@ -99,10 +103,10 @@ class Node:
             if event.button != 3:
                 for edge in self.edges:
                     for i, point in enumerate(edge.points):
-                        if circle_to_point_coll(point, 8, pygame.mouse.get_pos()):
+                        if circle_to_point_coll(point, 8, scale_fix(pygame.mouse.get_pos())):
                             which_edge_point = edge
                             moving_object_point_index = i
-                            moving_offset_point = (event.pos[0] - point[0], event.pos[1] - point[1])              
+                            moving_offset_point = ((event.pos[0] / scale - point[0]) + draw_where[0], (event.pos[1] / scale - point[1]) + draw_where[1])              
 
         if event.type == pygame.MOUSEBUTTONUP:
             moving_object_point_index = None
@@ -111,7 +115,7 @@ class Node:
  
         if event.type == pygame.MOUSEMOTION:
             if moving_object_point_index is not None:
-                which_edge_point.points[moving_object_point_index] = (event.pos[0] - moving_offset_point[0], event.pos[1] - moving_offset_point[1])        
+                which_edge_point.points[moving_object_point_index] = ((event.pos[0] / scale - moving_offset_point[0]) + draw_where[0], (event.pos[1] / scale - moving_offset_point[1])+ draw_where[1])        
     
 class Prop:
     def __init__(self, img, x, y, w, h, nodes) -> None:
@@ -135,19 +139,19 @@ class Prop:
         global moving_object, moving_offset
 
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if self.rect.collidepoint(event.pos):
+            if rectangle_to_point_coll(self.rect, scale_fix(event.pos)):
                 if event.button == 3:
                     self.right_clicked()
                 else:
                     moving_object = self
-                    moving_offset = (event.pos[0] - self.rect.topleft[0], event.pos[1] - self.rect.topleft[1])
+                    moving_offset = ((event.pos[0] / scale - self.rect.topleft[0])+ draw_where[0], (event.pos[1] / scale - self.rect.topleft[1])+ draw_where[1])
     
         if event.type == pygame.MOUSEBUTTONUP:
             moving_object = None
 
         if event.type == pygame.MOUSEMOTION:
             if moving_object is not None:
-                moving_object.rect.topleft = (event.pos[0] - moving_offset[0], event.pos[1] - moving_offset[1])
+                moving_object.rect.topleft = ((event.pos[0] / scale - moving_offset[0])+ draw_where[0], (event.pos[1] / scale - moving_offset[1])+ draw_where[1])
 
     def draw_nodes_and_edges(self, screen):
         for node in self.nodes:
@@ -156,13 +160,13 @@ class Prop:
                     draw_points(edge.points, edge.from_node.get_pos(), edge.to_node.get_pos(), edge.hasPlusElectric and edge.hasNegativeElectric)
               
         if temp_node is not None:
-            pygame.draw.circle(screen, (0, 0, 0), pygame.mouse.get_pos(), 10, 1)  
+            pygame.draw.circle(screen, (0, 0, 0), scale_fix(pygame.mouse.get_pos()), 10, 1)  
 
     def foundCableNodes(self, event): 
         global temp_node
         if event.type == pygame.MOUSEBUTTONDOWN:
             for node in self.nodes:
-                if circle_to_point_coll(node.get_pos(), node.radius, event.pos):
+                if circle_to_point_coll(node.get_pos(), node.radius, scale_fix(event.pos)):
                     if(temp_node != None):
                         if temp_node != node:
                             Edge(temp_node, node, temp_points.copy())
@@ -182,6 +186,8 @@ class Lamp(Prop):
     def update(self):
         positive_electric = False
         negative_electric = False
+        first_node = len(self.nodes[0].edges)
+        second_node = len(self.nodes[1].edges)
         for node in self.nodes:
             for edge in node.edges:
                 if edge.hasPlusElectric:
@@ -218,7 +224,7 @@ class Lamp(Prop):
                                     edge.to_node.parent.update()                                    
 
     
-        if positive_electric and negative_electric:
+        if positive_electric and negative_electric and (first_node > 0 ) and (second_node > 0):
             self.img = pygame.image.load("lamp.png")
             self.img = pygame.transform.scale(self.img, (50, 50))
             self.rect = self.img.get_rect(topleft=self.rect.topleft)
@@ -239,29 +245,11 @@ class Battery(Prop):
     def update(self):
         for edge in self.nodes[1].edges:
             edge.hasPlusElectric = True
-            if edge.from_node.parent != self:
-                for edge2 in edge.from_node.edges:
-                    if edge != edge2:
-                        edge2.hasPlusElectric = True
-                edge.from_node.parent.update()
-            if edge.to_node.parent != self:
-                for edge2 in edge.to_node.edges:
-                    if edge != edge2:
-                        edge2.hasPlusElectric = True
-                edge.to_node.parent.update()
+
                         
         for edge in self.nodes[0].edges:
             edge.hasNegativeElectric = True
-            if edge.from_node.parent != self:
-                for edge2 in edge.from_node.edges:
-                    if edge != edge2:
-                        edge2.hasNegativeElectric = True
-                edge.from_node.parent.update()
-            if edge.to_node.parent != self:
-                for edge2 in edge.to_node.edges:
-                    if edge != edge2:
-                        edge2.hasNegativeElectric = True
-                edge.to_node.parent.update() 
+
 
         
 
@@ -350,8 +338,11 @@ def draw_points(points, from_pos, to_pos, haselectricthing):
 
 
 
-# Screen init
-screen = pygame.display.set_mode((800, 600))
+
+main_screen = pygame.display.set_mode((1280, 720))
+
+
+
 
 # Title and Icon
 pygame.display.set_caption("Circuit Creator")
@@ -362,6 +353,8 @@ props = []
 
 edges = []
 
+scale = 2.0
+draw_where = [0,0]
 
 # Main loop
 running = True
@@ -380,30 +373,68 @@ lamp_option = SubmenuOption("lamp.png", 30, 50, 50, 50, Lamp)
 battery_option = SubmenuOption("battery.png", 100, 50, 100, 50, Battery)
 key_option = SubmenuOption("key.png", 200, 50, 180, 50, Key)
 
+def lerp(a,b,t):
+    return a + (b - a) * t
+
+def inverse_lerp(a,b,v):
+    return (v - a) / (b - a)
+
+def remap(v,a,b,c,d):
+    return lerp(c,d,inverse_lerp(a,b,v))
+
+def scale_fix(pos):
+    return ((pos[0]  - draw_where[0])/scale, (pos[1] - draw_where[1]) / scale)
+
 while running:
+    screen = main_screen.copy()
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_d:
-            for prop in props:
-                if prop.rect.collidepoint(pygame.mouse.get_pos()):
+        if event.type == pygame.KEYDOWN:                        
+            if event.key == pygame.K_d:
+                for prop in props:
+                    if rectangle_to_point_coll(prop.rect, scale_fix(pygame.mouse.get_pos())):
+                        for node in prop.nodes:
+                            for edge in node.edges:
+                                edge.remove(node)
+                        props.remove(prop)
+                        break
                     for node in prop.nodes:
                         for edge in node.edges:
-                            edge.remove(node)
-                    props.remove(prop)
-                    break
-                for node in prop.nodes:
-                    for edge in node.edges:
-                        for point in edge.points:
-                            if circle_to_point_coll(point, 8 , pygame.mouse.get_pos() ) :
-                                edge.points.remove(point)
+                            for point in edge.points:
+                                if circle_to_point_coll(point, 8 , scale_fix(pygame.mouse.get_pos()) ) :
+                                    edge.points.remove(point)
+            if event.key == pygame.K_UP:
+                draw_where[1] += 10
+            if event.key == pygame.K_DOWN:
+                draw_where[1] -= 10
+            if event.key == pygame.K_RIGHT:
+                draw_where[0] -= 10
+            if event.key == pygame.K_LEFT:
+                draw_where[0] += 10
+            if event.key == pygame.K_c:
+                draw_where = [0,0]
+        
+
+
+
+        if event.type == pygame.MOUSEWHEEL:
+            scale += event.y / 10
+            if scale < 1:
+                scale = 1
+
+      
+
 
 
 
         for prop in props:
             for node in prop.nodes:
-                node.movePoint(event)                  
+                node.movePoint(event)      
+
+        
 
                   
  
@@ -415,7 +446,7 @@ while running:
 
 
         if event.type == pygame.MOUSEBUTTONDOWN  and event.button == 3 and should_point and temp_node != None:
-            temp_points.append(event.pos)
+            temp_points.append(scale_fix(event.pos))
 
         main_menu_button.handle_event(event)
 
@@ -458,12 +489,12 @@ while running:
                 for edge in node.edges:
                     if not edge.hasPlusElectric:
                         edge.hasPlusElectric = True
-                        if edge.from_node != prop:
+                        if edge.from_node != node:
                             for edge2 in edge.from_node.edges:
                                 if edge != edge2:
                                     edge2.hasPlusElectric = True
                             edge.from_node.parent.update()
-                        if edge.to_node != prop:
+                        if edge.to_node != node:
                             for edge2 in edge.to_node.edges:
                                 if edge != edge2:
                                     edge2.hasPlusElectric = True
@@ -473,16 +504,18 @@ while running:
                 for edge in node.edges:
                     if not edge.hasNegativeElectric:
                         edge.hasNegativeElectric = True
-                        if edge.from_node.parent != prop:
+                        if edge.from_node != node:
                             for edge2 in edge.from_node.edges:
                                 if edge != edge2:
                                     edge2.hasNegativeElectric = True
                             edge.from_node.parent.update()
-                        if edge.to_node.parent != prop:
+                        if edge.to_node != node:
                             for edge2 in edge.to_node.edges:
                                 if edge != edge2:
                                     edge2.hasNegativeElectric = True
                             edge.to_node.parent.update()  
+
+
 
     for prop in props:
         prop.update()
@@ -491,8 +524,17 @@ while running:
 
 
     if temp_node is not None:
-        draw_points(temp_points, temp_node.get_pos(), pygame.mouse.get_pos(), False )
-    
+        draw_points(temp_points, temp_node.get_pos(), scale_fix(pygame.mouse.get_pos()), False )
+
+
+
+
+    size_before = screen.get_rect().size
+    size_now = (size_before[0] * scale, size_before[1] * scale)
+
+    main_screen.blit(pygame.transform.scale(screen, size_now), draw_where)
+    pygame.display.update()
     pygame.display.flip()
+
 
 pygame.quit()
