@@ -303,7 +303,60 @@ class Key(Prop):
             self.img = pygame.transform.scale(self.img, (100, 50))
             self.rect = self.img.get_rect(topleft=self.rect.topleft)
         super().draw(screen)
+        
+class Timer(Prop):
+    def __init__(self, x, y, duration_seconds=5):
+        super().__init__("stopwatch.png", x, y, 100, 50,
+                         [Node(self, -6, 30), Node(self, 107, 30)])
+        self.time = 0
+        self.duration_seconds = duration_seconds
+        self.is_active = False  
 
+    def advance_from(self, node, visited):
+        if self.time < 1:
+            return
+        
+        for battery_id in visited:
+            if self.id in visited[battery_id]:
+                return
+
+        others = self.get_other_nodes(node)
+        for other_node in others:
+            for edge in other_node.edges:
+                edge.visited = visited
+                for battery_id in edge.visited:
+                    edge.visited[battery_id].append(self.id)
+                edge.advance_from(other_node)
+
+    def update(self):
+        if self.is_active:
+            self.time += 1
+            if self.time >= self.duration_seconds * 60:  
+                self.is_active = False
+                self.time = 0
+                for edge in self.nodes[0].edges:
+                    if self.id in edge.visited:
+                        for pkey in edge.visited[self.id]:
+                            props[pkey].has_electricity = False
+
+    def right_clicked(self):
+        self.is_active = not self.is_active
+        if self.is_active:
+            self.time = 0
+            for edge in self.nodes[0].edges:
+                edge.visited[self.id] = []
+                edge.advance_from(self.nodes[0])
+
+    def draw(self, screen):
+        if self.has_electricity:
+            self.img = pygame.image.load("timer_on.png")  
+            self.img = pygame.transform.scale(self.img, (100, 50))
+            self.rect = self.img.get_rect(topleft=self.rect.topleft)
+        else:
+            self.img = pygame.image.load("stopwatch.png")  
+            self.img = pygame.transform.scale(self.img, (100, 50))
+            self.rect = self.img.get_rect(topleft=self.rect.topleft)
+        super().draw(screen)
 
 def draw_points(points, from_pos, to_pos, haselectricthing):
     color = (255, 0, 0) if haselectricthing else (0, 0, 0)
@@ -353,6 +406,7 @@ submenu_open = False
 lamp_option = SubmenuOption("newlamp.png", 0, 50, 180, 50, Lamp)
 battery_option = SubmenuOption("newbattery.png", 180, 50, 180, 50, Battery)
 key_option = SubmenuOption("newkey.png", 360, 50, 180, 50, Key)
+timer_option = SubmenuOption("newtimer.png", 540, 50,180, 50, Timer)
 
 
 def lerp(a, b, t):
@@ -427,7 +481,7 @@ while running:
         main_menu_button.handle_event(event)
 
         if main_menu_button.submenu_open:
-            submenu_options = [lamp_option, battery_option, key_option]
+            submenu_options = [lamp_option, battery_option, key_option, timer_option]
             for option in submenu_options:
                 option.handle_event(event)
 
@@ -437,7 +491,7 @@ while running:
 
     if main_menu_button.submenu_open:
        # pygame.draw.rect(screen, (200, 200, 200), (0, 45, 100, 70))
-        submenu_options = [lamp_option, battery_option, key_option]
+        submenu_options = [lamp_option, battery_option, key_option, timer_option]
         for option in submenu_options:
             option.draw(screen)
 
