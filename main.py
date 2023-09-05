@@ -43,6 +43,7 @@ class SubmenuOption:
         self.rect = self.image.get_rect(topleft=(x, y))
         self.prop_class = prop_class
 
+
     def draw(self, screen):
         screen.blit(self.image, self.rect.topleft)
 
@@ -305,7 +306,7 @@ class Key(Prop):
         super().draw(screen)
         
 class Timer(Prop):
-    def __init__(self, x, y, duration_seconds=5):
+    def __init__(self, x, y, duration_seconds = 5):
         super().__init__("stopwatch.png", x, y, 100, 50,
                          [Node(self, -6, 30), Node(self, 107, 30)])
         self.time = 0
@@ -329,6 +330,7 @@ class Timer(Prop):
                 edge.advance_from(other_node)
 
     def update(self):
+        self.changeTime()
         if self.is_active:
             self.time += 1
             if self.time >= self.duration_seconds * 60:  
@@ -346,6 +348,12 @@ class Timer(Prop):
             for edge in self.nodes[0].edges:
                 edge.visited[self.id] = []
                 edge.advance_from(self.nodes[0])
+    def changeTime(self):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_q:
+                self.duration_seconds -= 1
+            if event.key == pygame.K_e:
+                self.duration_seconds += 1
 
     def draw(self, screen):
         if self.has_electricity:
