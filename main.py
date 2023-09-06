@@ -214,7 +214,7 @@ class Prop:
 
 class Lamp(Prop):
     def __init__(self, x, y) -> None:
-        super().__init__("lightbulb.png", x, y, 50, 50,
+        super().__init__("images/lightbulb.png", x, y, 50, 50,
                          [Node(self, -2, 43), Node(self, 52, 43)])
 
     def advance_from(self, node, visited):
@@ -232,11 +232,11 @@ class Lamp(Prop):
 
     def draw(self, screen):
         if self.has_electricity:
-            self.img = pygame.image.load("lamp.png")
+            self.img = pygame.image.load("images/lamp.png")
             self.img = pygame.transform.scale(self.img, (50, 50))
             self.rect = self.img.get_rect(topleft=self.rect.topleft)
         else:
-            self.img = pygame.image.load("lightbulb.png")
+            self.img = pygame.image.load("images/lightbulb.png")
             self.img = pygame.transform.scale(self.img, (50, 50))
             self.rect = self.img.get_rect(topleft=self.rect.topleft)
         super().draw(screen)
@@ -244,7 +244,7 @@ class Lamp(Prop):
 
 class Battery(Prop):
     def __init__(self, x, y) -> None:
-        super().__init__("battery.png", x, y, 50, 50, [
+        super().__init__("images/battery.png", x, y, 50, 50, [
             Node(self, -4, 25), Node(self, 54, 25)])
 
         self.visited_before_me = {}
@@ -271,7 +271,7 @@ class Battery(Prop):
 
 class Key(Prop):
     def __init__(self, x, y) -> None:
-        super().__init__("blackkey.png", x, y, 100, 50,
+        super().__init__("images/blackkey.png", x, y, 100, 50,
                          [Node(self, -6, 30), Node(self, 107, 30)])
         self.is_open = False
 
@@ -296,18 +296,18 @@ class Key(Prop):
 
     def draw(self, screen):
         if self.is_open:
-            self.img = pygame.image.load("key.png")
+            self.img = pygame.image.load("images/key.png")
             self.img = pygame.transform.scale(self.img, (100, 50))
             self.rect = self.img.get_rect(topleft=self.rect.topleft)
         else:
-            self.img = pygame.image.load("blackkey.png")
+            self.img = pygame.image.load("images/blackkey.png")
             self.img = pygame.transform.scale(self.img, (100, 50))
             self.rect = self.img.get_rect(topleft=self.rect.topleft)
         super().draw(screen)
         
 class Timer(Prop):
     def __init__(self, x, y, duration_seconds = 5):
-        super().__init__("stopwatch.png", x, y, 100, 50,
+        super().__init__("images/stopwatch.png", x, y, 100, 50,
                          [Node(self, -6, 30), Node(self, 107, 30)])
         self.time = 0
         self.duration_seconds = duration_seconds
@@ -357,11 +357,11 @@ class Timer(Prop):
 
     def draw(self, screen):
         if self.has_electricity:
-            self.img = pygame.image.load("timer_on.png")  
+            self.img = pygame.image.load("images/timer_on.png")  
             self.img = pygame.transform.scale(self.img, (100, 50))
             self.rect = self.img.get_rect(topleft=self.rect.topleft)
         else:
-            self.img = pygame.image.load("stopwatch.png")  
+            self.img = pygame.image.load("images/stopwatch.png")  
             self.img = pygame.transform.scale(self.img, (100, 50))
             self.rect = self.img.get_rect(topleft=self.rect.topleft)
         super().draw(screen)
@@ -388,7 +388,7 @@ main_screen = pygame.display.set_mode((1280, 720))
 
 # Title and Icon
 pygame.display.set_caption("Circuit Creator")
-icon = pygame.image.load('electrical-circuit.png')
+icon = pygame.image.load('images/electrical-circuit.png')
 pygame.display.set_icon(icon)
 
 props = {}
@@ -407,14 +407,14 @@ moving_offset_point = (0, 0)
 which_edge_point = None
 
 
-main_menu_button = MenuButton("node.png", 10, 10)
+main_menu_button = MenuButton("images/node.png", 10, 10)
 
 submenu_open = False
 
-lamp_option = SubmenuOption("newlamp.png", 0, 50, 180, 50, Lamp)
-battery_option = SubmenuOption("newbattery.png", 180, 50, 180, 50, Battery)
-key_option = SubmenuOption("newkey.png", 360, 50, 180, 50, Key)
-timer_option = SubmenuOption("newtimer.png", 540, 50,180, 50, Timer)
+lamp_option = SubmenuOption("images/newlamp.png", 0, 50, 180, 50, Lamp)
+battery_option = SubmenuOption("images/newbattery.png", 180, 50, 180, 50, Battery)
+key_option = SubmenuOption("images/newkey.png", 360, 50, 180, 50, Key)
+timer_option = SubmenuOption("images/newtimer.png", 540, 50,180, 50, Timer)
 
 
 def lerp(a, b, t):
